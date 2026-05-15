@@ -1,6 +1,33 @@
 # ConsultaCEP MVC
 
-Aplicacao desktop em Delphi VCL para consultar enderecos brasileiros a partir de um CEP, consumir APIs REST externas, manter a interface responsiva com `TTask` e persistir historico em Firebird.
+![ConsultaCEP MVC](docs/assets/consulta-cep-hero.svg)
+
+![Delphi VCL](docs/assets/badge-delphi.svg)
+![Firebird](docs/assets/badge-firebird.svg)
+![MVC](docs/assets/badge-mvc.svg)
+![REST](docs/assets/badge-rest.svg)
+![DUnitX](docs/assets/badge-tests.svg)
+
+Aplicacao desktop em **Delphi VCL** para consultar enderecos brasileiros a partir de um CEP, consumir APIs REST externas, manter a interface responsiva com `TTask` e persistir historico em **Firebird**.
+
+![Painel de resumo](docs/assets/painel-resumo.svg)
+
+## Identidade Visual
+
+![Paleta visual](docs/assets/paleta.svg)
+
+<table>
+  <tr>
+    <td bgcolor="#fee2e2"><b>Delphi VCL</b><br>Interface desktop com formulario principal em .dfm.</td>
+    <td bgcolor="#ede9fe"><b>MVC + DI</b><br>View, Controller, Service e contratos por interfaces.</td>
+    <td bgcolor="#dcfce7"><b>REST</b><br>Gateways ViaCEP e BrasilAPI por adapters.</td>
+  </tr>
+  <tr>
+    <td bgcolor="#ffedd5"><b>Firebird</b><br>Historico com domains, sequence, tabela e stored procedure.</td>
+    <td bgcolor="#e0f2fe"><b>TTask</b><br>Consulta em background sem congelar a interface.</td>
+    <td bgcolor="#fef9c3"><b>DUnitX</b><br>Testes unitarios com fakes e sem infraestrutura externa.</td>
+  </tr>
+</table>
 
 ## Visao Geral
 
@@ -43,6 +70,8 @@ Aplicacao desktop em Delphi VCL para consultar enderecos brasileiros a partir de
 | Testabilidade | Service testavel sem internet, banco ou tela. | DUnitX com fakes em `Tests/ConsultaCEP.Tests.Service.pas`. |
 
 ## Camadas
+
+![Arquitetura MVC](docs/assets/arquitetura-mvc.svg)
 
 | Camada | Pasta | Responsabilidade |
 |---|---|---|
@@ -157,6 +186,8 @@ Path=C:\caminho\consultacep.fdb
 
 ## Banco
 
+![Banco Firebird](docs/assets/banco-firebird.svg)
+
 Script principal:
 
 ```text
@@ -180,6 +211,8 @@ isql -ch UTF8 -user SYSDBA -password masterkey Database\CONSULTACEP_MVC.FDB -i S
 ```
 
 ## Testes
+
+![Testes DUnitX](docs/assets/badge-tests.svg)
 
 Projeto de testes:
 
