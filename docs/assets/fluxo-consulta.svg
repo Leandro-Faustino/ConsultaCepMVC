@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="520" viewBox="0 0 1180 520" role="img" aria-labelledby="title desc">
+  <title id="title">Fluxo de consulta de CEP</title>
+  <desc id="desc">Fluxo da consulta assíncrona do usuário até a API e banco Firebird, retornando para a tela.</desc>
+  <rect width="1180" height="520" fill="#f8fafc"/>
+  <text x="60" y="64" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700" fill="#0f172a">Fluxo da Consulta Assincrona</text>
+  <text x="60" y="96" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#475569">A operacao lenta roda em TTask. A tela VCL so e atualizada com TThread.Queue.</text>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#334155"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <g font-family="Segoe UI, Arial, sans-serif" filter="url(#shadow)">
+    <rect x="70" y="160" width="140" height="74" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="112" y="190" font-size="18" font-weight="700" fill="#1e3a8a">Usuario</text>
+    <text x="104" y="214" font-size="14" fill="#1e293b">digita CEP</text>
+    <rect x="270" y="160" width="150" height="74" rx="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <text x="318" y="190" font-size="18" font-weight="700" fill="#075985">View</text>
+    <text x="301" y="214" font-size="14" fill="#1e293b">TFormMain</text>
+    <rect x="480" y="160" width="172" height="74" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="520" y="190" font-size="18" font-weight="700" fill="#5b21b6">Controller</text>
+    <text x="524" y="214" font-size="14" fill="#1e293b">inicia TTask</text>
+    <rect x="712" y="160" width="148" height="74" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="761" y="190" font-size="18" font-weight="700" fill="#92400e">Model</text>
+    <text x="745" y="214" font-size="14" fill="#1e293b">valida e coordena</text>
+    <rect x="920" y="130" width="170" height="74" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="969" y="160" font-size="18" font-weight="700" fill="#166534">API CEP</text>
+    <text x="953" y="184" font-size="14" fill="#1e293b">ViaCEP/BrasilAPI</text>
+    <rect x="920" y="265" width="170" height="74" rx="10" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+    <text x="969" y="295" font-size="18" font-weight="700" fill="#9f1239">Firebird</text>
+    <text x="952" y="319" font-size="14" fill="#1e293b">salva historico</text>
+  </g>
+  <g stroke="#334155" stroke-width="3" fill="none" marker-end="url(#arrow)">
+    <path d="M210 197 H270"/>
+    <path d="M420 197 H480"/>
+    <path d="M652 197 H712"/>
+    <path d="M860 184 H920"/>
+    <path d="M860 210 C900 225 895 288 920 302"/>
+    <path d="M920 326 C760 438 520 414 345 246"/>
+  </g>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#334155">
+    <text x="480" y="300">Thread secundaria: HTTP + banco</text>
+    <text x="430" y="412">Retorno para UI: TThread.Queue</text>
+  </g>
+  <path d="M450 280 H872" stroke="#64748b" stroke-width="2" stroke-dasharray="10 8"/>
+  <text x="602" y="274" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#475569">fora da thread da VCL</text>
+</svg>
