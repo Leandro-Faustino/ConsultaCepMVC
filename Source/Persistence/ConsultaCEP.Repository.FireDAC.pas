@@ -8,13 +8,15 @@ uses
   FireDAC.Comp.Client;
 
 type
+  TConnectionFactory = reference to function: TFDConnection;
+
   TRepositorioConsultaFireDAC = class(TInterfacedObject, IRepositorioConsulta)
   private
-    FConnection: TFDConnection;
+    FConnectionFactory: TConnectionFactory;
   public
-    constructor Create(AConnection: TFDConnection);
+    constructor Create(const AConnectionFactory: TConnectionFactory);
     function Salvar(const AConsulta: TConsultaCEPRecord): Int64;
-    function ListarTodos: TArray<TConsultaCEPRecord>;
+    function ListarRecentes(AMaxRegistros: Integer): TArray<TConsultaCEPRecord>;
   end;
 
 implementation
@@ -23,39 +25,50 @@ uses
   System.SysUtils,
   FireDAC.Stan.Param;
 
-constructor TRepositorioConsultaFireDAC.Create(AConnection: TFDConnection);
+constructor TRepositorioConsultaFireDAC.Create(
+  const AConnectionFactory: TConnectionFactory);
 begin
   inherited Create;
-  if AConnection = nil then
-    raise EArgumentNilException.Create('AConnection nao pode ser nil');
-  FConnection := AConnection;
+  if not Assigned(AConnectionFactory) then
+    raise EArgumentNilException.Create('AConnectionFactory nao pode ser nil');
+  FConnectionFactory := AConnectionFactory;
 end;
 
-function TRepositorioConsultaFireDAC.ListarTodos: TArray<TConsultaCEPRecord>;
+function TRepositorioConsultaFireDAC.ListarRecentes(
+  AMaxRegistros: Integer): TArray<TConsultaCEPRecord>;
 var
+  LConnection: TFDConnection;
   LQuery: TFDQuery;
   LItem: TConsultaCEPRecord;
 begin
   SetLength(Result, 0);
+  if AMaxRegistros <= 0 then
+    Exit;
+
+  LConnection := FConnectionFactory();
   LQuery := TFDQuery.Create(nil);
   try
-    LQuery.Connection := FConnection;
-    LQuery.SQL.Text := 'SELECT * FROM SP_LISTAR_HISTORICO';
+    LQuery.Connection := LConnection;
+    LQuery.SQL.Text :=
+      'SELECT FIRST :MAX_REGISTROS ID, CEP, DATA_HORA, RESULTADO, ' +
+      'LOGRADOURO, BAIRRO, CIDADE, UF, COMPLEMENTO, GATEWAY_USADO ' +
+      'FROM CONSULTA_CEP ORDER BY DATA_HORA DESC';
+    LQuery.ParamByName('MAX_REGISTROS').AsInteger := AMaxRegistros;
     LQuery.Open;
     while not LQuery.Eof do
     begin
       LItem := Default(TConsultaCEPRecord);
-      LItem.ID := LQuery.FieldByName('R_ID').AsLargeInt;
-      LItem.CEP := LQuery.FieldByName('R_CEP').AsString;
-      LItem.DataHora := LQuery.FieldByName('R_DATA_HORA').AsDateTime;
+      LItem.ID := LQuery.FieldByName('ID').AsLargeInt;
+      LItem.CEP := LQuery.FieldByName('CEP').AsString;
+      LItem.DataHora := LQuery.FieldByName('DATA_HORA').AsDateTime;
       LItem.Resultado := ResultadoConsultaFromDatabaseValue(
-        LQuery.FieldByName('R_RESULTADO').AsString);
-      LItem.Logradouro := LQuery.FieldByName('R_LOGRADOURO').AsString;
-      LItem.Bairro := LQuery.FieldByName('R_BAIRRO').AsString;
-      LItem.Cidade := LQuery.FieldByName('R_CIDADE').AsString;
-      LItem.UF := LQuery.FieldByName('R_UF').AsString;
-      LItem.Complemento := LQuery.FieldByName('R_COMPLEMENTO').AsString;
-      LItem.GatewayUsado := LQuery.FieldByName('R_GATEWAY_USADO').AsString;
+        LQuery.FieldByName('RESULTADO').AsString);
+      LItem.Logradouro := LQuery.FieldByName('LOGRADOURO').AsString;
+      LItem.Bairro := LQuery.FieldByName('BAIRRO').AsString;
+      LItem.Cidade := LQuery.FieldByName('CIDADE').AsString;
+      LItem.UF := LQuery.FieldByName('UF').AsString;
+      LItem.Complemento := LQuery.FieldByName('COMPLEMENTO').AsString;
+      LItem.GatewayUsado := LQuery.FieldByName('GATEWAY_USADO').AsString;
 
       SetLength(Result, Length(Result) + 1);
       Result[High(Result)] := LItem;
@@ -63,17 +76,20 @@ begin
     end;
   finally
     LQuery.Free;
+    LConnection.Free;
   end;
 end;
 
 function TRepositorioConsultaFireDAC.Salvar(
   const AConsulta: TConsultaCEPRecord): Int64;
 var
+  LConnection: TFDConnection;
   LProc: TFDStoredProc;
 begin
+  LConnection := FConnectionFactory();
   LProc := TFDStoredProc.Create(nil);
   try
-    LProc.Connection := FConnection;
+    LProc.Connection := LConnection;
     LProc.StoredProcName := 'SP_SALVAR_CONSULTA';
     LProc.Prepare;
     LProc.ParamByName('P_CEP').AsString := AConsulta.CEP;
@@ -88,6 +104,7 @@ begin
     Result := LProc.FieldByName('P_ID').AsLargeInt;
   finally
     LProc.Free;
+    LConnection.Free;
   end;
 end;
 

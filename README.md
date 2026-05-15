@@ -1,167 +1,80 @@
 # ConsultaCEP MVC
 
-![ConsultaCEP MVC](docs/assets/consulta-cep-hero.svg)
+Aplicacao desktop em Delphi VCL para consultar enderecos brasileiros a partir de um CEP, consumir APIs REST externas, manter a interface responsiva com `TTask` e persistir historico em Firebird.
 
-![Delphi VCL](docs/assets/badge-delphi.svg)
-![Firebird](docs/assets/badge-firebird.svg)
-![MVC](docs/assets/badge-mvc.svg)
-![REST](docs/assets/badge-rest.svg)
-![DUnitX](docs/assets/badge-tests.svg)
+## Visao Geral
 
-![Paleta visual](docs/assets/paleta.svg)
-
-Aplicação desktop em **Delphi VCL** para consultar endereços brasileiros a partir de um CEP, consumir APIs REST externas, manter a interface responsiva com `TTask` e persistir o histórico completo em **Firebird**.
-
-O projeto foi construído do zero seguindo **Processo Unificado**, com concepção, elaboração, arquitetura MVC, padrões GRASP/GoF, banco relacional, testes unitários e separação por contratos.
-
-![Painel de resumo](docs/assets/painel-resumo.svg)
-
-## Identidade Visual
-
-<table>
-  <tr>
-    <td bgcolor="#fee2e2"><b>Delphi VCL</b><br>Interface desktop e formulário principal.</td>
-    <td bgcolor="#ede9fe"><b>MVC</b><br>Separação entre View, Controller e Model.</td>
-    <td bgcolor="#dcfce7"><b>REST</b><br>Gateways ViaCEP e BrasilAPI por adapters.</td>
-  </tr>
-  <tr>
-    <td bgcolor="#ffedd5"><b>Firebird</b><br>Histórico, procedures, triggers e domains.</td>
-    <td bgcolor="#e0f2fe"><b>TTask</b><br>Consulta assíncrona sem congelar a tela.</td>
-    <td bgcolor="#fef9c3"><b>DUnitX</b><br>Testes unitários com fakes e sem infraestrutura externa.</td>
-  </tr>
-</table>
-
-## Visão Geral
-
-| Item | Descrição |
+| Item | Descricao |
 |---|---|
-| **Objetivo** | Consultar CEPs, exibir endereço e gravar histórico auditável. |
-| **Interface** | Aplicação desktop VCL com formulário criado por código. |
-| **Banco** | Firebird com domains, sequences, triggers, stored procedures e view. |
-| **APIs** | ViaCEP como gateway principal e BrasilAPI como alternativa. |
-| **Arquitetura** | MVC com interfaces entre View, Controller, Model, Integration e Persistence. |
-| **Responsividade** | Consulta e histórico em background com `TTask`; atualização da VCL via `TThread.Queue`. |
-| **Testes** | DUnitX com fakes para testar o Model sem internet, banco ou tela. |
+| Interface | VCL com formulario em `.dfm` e handlers apenas delegando ao Controller. |
+| Arquitetura | MVC com interfaces, Application Service e Pure DI no bootstrap. |
+| Dominio | DTOs como records e value object `TCEP` para validacao. |
+| APIs | `TViaCEPAdapter` como padrao e `TBrasilAPIAdapter` como alternativa via `.ini`. |
+| Banco | Firebird 3.0+ com domains, sequence, tabela `CONSULTA_CEP` e SP de insert. |
+| Threading | Controller dispara `TTask`; atualizacao de UI via `TThread.Queue`. |
+| Testes | DUnitX com fakes, sem internet, banco ou VCL. |
 
-## Funcionalidades
+## Requisitos Funcionais
 
-| Funcionalidade | Status | Resultado |
-|---|---:|---|
-| Validar CEP com 8 dígitos numéricos | `entregue` | Bloqueia CEP inválido antes da API. |
-| Consultar endereço na ViaCEP | `entregue` | Retorna logradouro, bairro, cidade, UF e complemento. |
-| Suportar BrasilAPI | `entregue` | Adapter alternativo implementado. |
-| Persistir histórico | `entregue` | Registra sucesso, CEP não encontrado e erro de API. |
-| Visualizar histórico | `entregue` | Grid com consultas ordenadas por data/hora desc. |
-| Evitar travamento da tela | `entregue` | Operações lentas executadas em thread. |
-| Testar regra de negócio | `entregue` | Testes DUnitX com fakes. |
+| Codigo | Requisito | Implementacao |
+|---|---|---|
+| RF01 | Validar CEP com exatamente 8 digitos numericos. | `TCEP.TryParse` em `Source/Domain/ConsultaCEP.CEP.pas`. |
+| RF02 | Consultar endereco via gateway externo. | `TViaCEPAdapter` e `TBrasilAPIAdapter`. |
+| RF03 | Exibir logradouro, bairro, cidade, UF e complemento. | `TFormMain.AtualizarEndereco`. |
+| RF04 | Informar CEP invalido, CEP nao encontrado e erro de API. | `TDadosEnderecoDTO.Resultado` e mensagens da View. |
+| RF05 | Persistir consultas com sucesso, nao encontradas e erro de API. | `TConsultaCEPService.TentarSalvarHistorico`. |
+| RF06 | Nao persistir CEP invalido. | Retorno antecipado no Service antes do gateway. |
+| RF07 | Exibir historico em grid com registros recentes. | `SolicitarHistorico` + `ListarRecentes(10000)`. |
+| RF08 | Permitir trocar gateway sem alterar as camadas. | `config/ConsultaCEP.ini`, chave `Gateway.Ativo`. |
 
-## Requisitos
+## Requisitos Nao Funcionais
 
-| Categoria | Requisito |
-|---|---|
-| **IDE** | Delphi 10.x ou superior, com VCL e FireDAC. |
-| **Banco** | Firebird 3.0+ recomendado, character set UTF8. |
-| **Cliente DB** | `isql` para criação e execução do script DDL. |
-| **Rede** | Acesso à internet para consultar ViaCEP ou BrasilAPI. |
-| **Testes** | DUnitX disponível no path de bibliotecas do Delphi. |
+| Categoria | Requisito | Implementacao |
+|---|---|---|
+| Usabilidade | Campo de CEP aceita apenas digitos e limita a 8 caracteres. | `NumbersOnly=True`, `MaxLength=8` e handler `edtCEPKeyPress`. |
+| Usabilidade | Enter no campo aciona a busca. | `edtCEPKeyPress` delega para `btnBuscarClick`. |
+| Usabilidade | Botao e campo ficam bloqueados durante a consulta. | `IConsultaCEPView.SetCarregando`. |
+| Confiabilidade | Falha de API nao trava a aplicacao. | Excecao capturada no Service e convertida em `rcErroAPI`. |
+| Confiabilidade | Falha de banco nao impede exibir o resultado. | Excecao de persistencia e registrada no logger. |
+| Desempenho | UI permanece responsiva. | Consulta e historico rodam em `TTask`. |
+| Desempenho | Timeout HTTP de 10 segundos. | `ConnectionTimeout` e `ResponseTimeout` nos adapters. |
+| Desempenho | Historico limitado para evitar carga sem controle. | `ListarRecentes(AMaxRegistros)` com `SELECT FIRST`. |
+| Manutenibilidade | Camadas dependem de interfaces. | Contratos em `ConsultaCEP.Interfaces.pas`. |
+| Testabilidade | Service testavel sem internet, banco ou tela. | DUnitX com fakes em `Tests/ConsultaCEP.Tests.Service.pas`. |
 
-## Arquitetura
-
-![Arquitetura MVC](docs/assets/arquitetura-mvc.svg)
-
-### Camadas
+## Camadas
 
 | Camada | Pasta | Responsabilidade |
 |---|---|---|
-| **Domain** | `Source/Domain` | Interfaces, DTOs, records e enumerações. |
-| **Model** | `Source/Model` | Validação, regras de negócio e coordenação do fluxo. |
-| **Controller** | `Source/Controller` | Recebe ações da View, executa TTask e atualiza a tela. |
-| **View** | `Source/View` | Formulário VCL, entrada do usuário e exibição dos resultados. |
-| **Integration** | `Source/Integration` | Adapters REST para ViaCEP e BrasilAPI. |
-| **Persistence** | `Source/Persistence` | Repositório FireDAC/Firebird. |
-| **Bootstrap** | `Source/Bootstrap` | Composition Root: cria e conecta as classes concretas. |
+| Domain | `Source/Domain` | Interfaces, DTOs, enum e `TCEP`. |
+| Service | `Source/Service` | Valida CEP, chama gateway, monta registro e persiste. |
+| Controller | `Source/Controller` | Coordena UI, `TTask` e retorno para a thread principal. |
+| View | `Source/View` | Form VCL em `.dfm`, entrada do usuario e exibicao. |
+| Integration | `Source/Integration` | Adapters REST ViaCEP e BrasilAPI. |
+| Persistence | `Source/Persistence` | Repository FireDAC com factory de conexao por operacao. |
+| Infra | `Source/Infra` | `TFileLogger` e `TNullLogger`. |
+| Bootstrap | `Source/Bootstrap` | Composition Root e configuracao Pure DI. |
 
-### Contratos Principais
-
-| Interface | Implementação | Papel |
-|---|---|---|
-| `IConsultaCEPView` | `TFormMain` | Atualizar tela, mensagens, histórico e estado de carregamento. |
-| `IConsultaCEPController` | `TConsultaCEPController` | Operações `ConsultarCEP` e `SolicitarHistorico`. |
-| `IGatewayEndereco` | `TViaCEPAdapter`, `TBrasilAPIAdapter` | Busca polimórfica de endereço em APIs externas. |
-| `IRepositorioConsulta` | `TRepositorioConsultaFireDAC` | Salvar e listar consultas no Firebird. |
-
-## Fluxo da Consulta
+## Fluxo Ponto a Ponto
 
 ![Fluxo da Consulta](docs/assets/fluxo-consulta.svg)
 
-1. O usuário digita o CEP e aciona **Buscar**.
-2. A View chama o Controller via `IConsultaCEPController`.
-3. O Controller desabilita a tela e inicia `TTask.Run`.
-4. O Model valida o CEP, chama o gateway e tenta salvar o histórico.
-5. O repositório executa stored procedures no Firebird.
-6. A tela é atualizada com segurança via `TThread.Queue`.
+1. Usuario digita o CEP e aciona **Buscar** ou pressiona Enter.
+2. `TFormMain` delega para `IConsultaCEPController.ConsultarCEP`.
+3. `TConsultaCEPController` chama `SetCarregando(True)` e inicia um `TTask`.
+4. No background, `TConsultaCEPService` valida o texto com `TCEP.TryParse`.
+5. Se o CEP for invalido, o Service retorna `rcCEPInvalido` sem chamar API e sem salvar historico.
+6. Se o CEP for valido, o Service chama `IGatewayEndereco.BuscarEndereco`.
+7. O adapter executa HTTP GET, interpreta o JSON e devolve `TDadosEnderecoDTO`.
+8. Em caso de excecao no gateway, o Service cria um DTO `rcErroAPI`.
+9. Para sucesso, CEP nao encontrado ou erro de API, o Service monta `TConsultaCEPRecord`.
+10. `TRepositorioConsultaFireDAC` abre uma conexao propria pela factory e executa `SP_SALVAR_CONSULTA`.
+11. Se a persistencia falhar, o erro vai para `ILogger`, mas o DTO continua voltando para a tela.
+12. O Controller busca o historico com `ObterHistorico(10000)`.
+13. O Controller usa `TThread.Queue` para voltar para a thread principal.
+14. A View atualiza endereco, mensagem, grid de historico e libera os controles.
 
-## Diagramas UML
-
-### Diagrama de Classe
-
-```mermaid
-classDiagram
-direction LR
-
-class IConsultaCEPView {
-  <<interface>>
-  +AtualizarEndereco(dto)
-  +ExibirMensagem(msg)
-  +ExibirHistorico(registros)
-  +SetCarregando(valor)
-}
-
-class IConsultaCEPController {
-  <<interface>>
-  +ConsultarCEP(cep)
-  +SolicitarHistorico()
-}
-
-class IGatewayEndereco {
-  <<interface>>
-  +Nome() string
-  +BuscarEndereco(cep) TDadosEnderecoDTO
-}
-
-class IRepositorioConsulta {
-  <<interface>>
-  +Salvar(consulta) Int64
-  +ListarTodos() TArray
-}
-
-class TFormMain
-class TConsultaCEPController
-class TConsultaCEPModel
-class TViaCEPAdapter
-class TBrasilAPIAdapter
-class TRepositorioConsultaFireDAC
-class AppRegistration
-
-TFormMain ..|> IConsultaCEPView
-TConsultaCEPController ..|> IConsultaCEPController
-TViaCEPAdapter ..|> IGatewayEndereco
-TBrasilAPIAdapter ..|> IGatewayEndereco
-TRepositorioConsultaFireDAC ..|> IRepositorioConsulta
-
-TFormMain --> IConsultaCEPController
-TConsultaCEPController --> IConsultaCEPView
-TConsultaCEPController --> TConsultaCEPModel
-TConsultaCEPModel --> IGatewayEndereco
-TConsultaCEPModel --> IRepositorioConsulta
-AppRegistration ..> TFormMain
-AppRegistration ..> TConsultaCEPController
-AppRegistration ..> TConsultaCEPModel
-AppRegistration ..> TViaCEPAdapter
-AppRegistration ..> TRepositorioConsultaFireDAC
-```
-
-### Diagrama de Sequência
+## Diagrama de Sequencia
 
 ```mermaid
 sequenceDiagram
@@ -169,44 +82,80 @@ autonumber
 actor Usuario
 participant View as TFormMain
 participant Ctrl as TConsultaCEPController
-participant Model as TConsultaCEPModel
-participant GW as IGatewayEndereco
+participant Task as TTask
+participant Service as TConsultaCEPService
+participant CEP as TCEP
+participant Gateway as IGatewayEndereco
 participant API as API CEP
 participant Repo as TRepositorioConsultaFireDAC
 participant DB as Firebird
+participant Log as ILogger
 
 Usuario->>View: Buscar CEP
 View->>Ctrl: ConsultarCEP(cep)
-Ctrl->>Ctrl: TTask.Run
-Ctrl->>Model: ConsultarCEP(cep)
-Model->>Model: ValidarCEP(cep)
-Model->>GW: BuscarEndereco(cep)
-GW->>API: HTTP GET
-API-->>GW: JSON
-GW-->>Model: TDadosEnderecoDTO
-Model->>Repo: Salvar(registro)
-Repo->>DB: SP_SALVAR_CONSULTA
-DB-->>Repo: ID
-Model-->>Ctrl: DTO
-Ctrl->>Model: ObterHistorico()
-Model->>Repo: ListarTodos()
-Repo->>DB: SP_LISTAR_HISTORICO
+Ctrl->>View: SetCarregando(True)
+Ctrl->>Task: TTask.Run
+Task->>Service: ConsultarCEP(cep)
+Service->>CEP: TryParse(cep)
+
+alt CEP invalido
+  CEP-->>Service: False
+  Service-->>Task: DTO rcCEPInvalido
+else CEP valido
+  CEP-->>Service: True
+  Service->>Gateway: BuscarEndereco(cep)
+  Gateway->>API: HTTP GET
+  API-->>Gateway: JSON ou erro HTTP
+  Gateway-->>Service: TDadosEnderecoDTO
+  Service->>Repo: Salvar(TConsultaCEPRecord)
+  Repo->>DB: EXECUTE PROCEDURE SP_SALVAR_CONSULTA
+  DB-->>Repo: P_ID
+  Repo-->>Service: ID
+  Service-->>Task: DTO
+end
+
+opt Falha de API
+  Gateway--xService: Exception
+  Service->>Log: Erro(...)
+  Service->>Repo: Salvar(registro rcErroAPI)
+end
+
+opt Falha de persistencia
+  Repo--xService: Exception
+  Service->>Log: Erro(...)
+end
+
+Task->>Service: ObterHistorico(10000)
+Service->>Repo: ListarRecentes(10000)
+Repo->>DB: SELECT FIRST :MAX_REGISTROS ...
 DB-->>Repo: Registros
-Repo-->>Model: TArray<TConsultaCEPRecord>
-Model-->>Ctrl: Registros
-Ctrl-->>View: TThread.Queue: atualizar UI
-View-->>Usuario: Endereco + historico
+Repo-->>Service: TArray<TConsultaCEPRecord>
+Service-->>Task: Historico
+Task->>Ctrl: TThread.Queue
+Ctrl->>View: AtualizarEndereco ou ExibirMensagem
+Ctrl->>View: ExibirHistorico
+Ctrl->>View: SetCarregando(False)
 ```
 
-## Banco de Dados
+## Configuracao
 
-![Banco Firebird](docs/assets/banco-firebird.svg)
+O arquivo `config/ConsultaCEP.ini` controla o gateway ativo:
 
-O banco fica em:
-
-```text
-Database/CONSULTACEP_MVC.FDB
+```ini
+[Gateway]
+Ativo=ViaCEP
 ```
+
+Use `Ativo=BrasilAPI` para trocar o adapter sem alterar as camadas da aplicacao.
+
+O banco padrao e procurado em `Database/CONSULTACEP_MVC.FDB`. Se precisar informar outro caminho, preencha:
+
+```ini
+[Database]
+Path=C:\caminho\consultacep.fdb
+```
+
+## Banco
 
 Script principal:
 
@@ -214,100 +163,23 @@ Script principal:
 SQL/ConsultaCEP.Firebird.ddl.sql
 ```
 
-### Tabelas
-
-| Tabela | Finalidade |
-|---|---|
-| `CONSULTA_CEP` | Histórico de consultas, incluindo CEP, data/hora, resultado, endereço e gateway usado. |
-| `GATEWAY_CONFIG` | Gateways disponíveis, URL base, classe Delphi, ativação e prioridade. |
-
-### Objetos Firebird
+Objetos criados:
 
 | Tipo | Objetos |
 |---|---|
-| **Domains** | `D_ID`, `D_CEP`, `D_RESULTADO`, `D_DESCRICAO`, `D_NOME_CURTO`, `D_UF`, `D_GATEWAY`, `D_TIMESTAMP` |
-| **Sequences** | `SEQ_CONSULTA_CEP`, `SEQ_GATEWAY_CONFIG` |
-| **Triggers** | `TRG_CONSULTA_CEP_BI`, `TRG_GATEWAY_CONFIG_BI` |
-| **Stored Procedures** | `SP_SALVAR_CONSULTA`, `SP_LISTAR_HISTORICO`, `SP_OBTER_GATEWAY_ATIVO` |
-| **View** | `VW_HISTORICO_CONSULTAS` |
+| Domains | `D_ID`, `D_CEP`, `D_RESULTADO`, `D_DESCRICAO`, `D_NOME_CURTO`, `D_UF`, `D_GATEWAY`, `D_TIMESTAMP` |
+| Sequence | `SEQ_CONSULTA_CEP` |
+| Tabela | `CONSULTA_CEP` |
+| Stored procedure | `SP_SALVAR_CONSULTA` |
+| Indices | CEP, data/hora e resultado |
 
-### Criação via isql
-
-```sql
-CREATE DATABASE 'C:\Users\Leand\OneDrive\Documentos\Embarcadero\Studio\Projects\delphi\ConsultaCEP_MVC\Database\CONSULTACEP_MVC.FDB'
-PAGE_SIZE 16384
-DEFAULT CHARACTER SET UTF8;
-```
-
-Depois execute:
+Criacao via `isql`:
 
 ```bat
 isql -ch UTF8 -user SYSDBA -password masterkey Database\CONSULTACEP_MVC.FDB -i SQL\ConsultaCEP.Firebird.ddl.sql
 ```
 
-## Padrões Aplicados
-
-| Elemento | Padrões | Benefício |
-|---|---|---|
-| `TFormMain` | MVC View, Coesão Alta | Tela sem regra de negócio. |
-| `TConsultaCEPController` | MVC Controller, GRASP Controller | Coordena casos de uso e thread. |
-| `TConsultaCEPModel` | Facade, Expert, Creator | Centraliza regras de negócio e simplifica uso pelo Controller. |
-| `IGatewayEndereco` | Strategy, Protected Variations | Troca de API sem alterar o Model. |
-| `TViaCEPAdapter` / `TBrasilAPIAdapter` | Adapter, Strategy | Traduz JSON externo para DTO interno. |
-| `TRepositorioConsultaFireDAC` | Repository, Pure Fabrication | Isola FireDAC e SQL do domínio. |
-| `App.Registration` | Factory, Composition Root | Único ponto que conhece classes concretas. |
-
-## Regras de Negócio
-
-| Código | Regra |
-|---|---|
-| `RN01` | CEP válido possui exatamente 8 dígitos numéricos. |
-| `RN02` | Toda consulta enviada ao gateway deve ser registrada no histórico. |
-| `RN03` | CEP inválido não é registrado, pois é rejeitado antes da API. |
-| `RN04` | Falha ao salvar histórico não deve impedir a exibição do resultado. |
-| `RN05` | Falha de API deve gerar DTO de erro e mensagem amigável ao usuário. |
-
-## Estrutura do Projeto
-
-```text
-ConsultaCEP_MVC/
-├─ ConsultaCEP_MVC.dpr
-├─ ConsultaCEP_MVC.dproj
-├─ Database/
-│  └─ CONSULTACEP_MVC.FDB
-├─ SQL/
-│  └─ ConsultaCEP.Firebird.ddl.sql
-├─ Source/
-│  ├─ Bootstrap/
-│  │  └─ App.Registration.pas
-│  ├─ Controller/
-│  │  └─ ConsultaCEP.Controller.pas
-│  ├─ Domain/
-│  │  ├─ ConsultaCEP.DTO.pas
-│  │  └─ ConsultaCEP.Interfaces.pas
-│  ├─ Integration/
-│  │  ├─ ConsultaCEP.Gateway.BrasilAPI.pas
-│  │  └─ ConsultaCEP.Gateway.ViaCEP.pas
-│  ├─ Model/
-│  │  └─ ConsultaCEP.Model.pas
-│  ├─ Persistence/
-│  │  └─ ConsultaCEP.Repository.FireDAC.pas
-│  └─ View/
-│     └─ ConsultaCEP.View.Main.pas
-└─ Tests/
-   ├─ ConsultaCEP.Tests.dpr
-   └─ ConsultaCEP.Tests.Model.pas
-```
-
-## Execução
-
-1. Abra `ConsultaCEP_MVC.dpr` no Delphi.
-2. Confirme que o Firebird está instalado e ativo.
-3. Garanta que `Database/CONSULTACEP_MVC.FDB` existe ou crie pelo `isql`.
-4. Compile e execute o projeto.
-5. Digite um CEP com 8 números e clique em **Buscar**.
-
-## Testes DUnitX
+## Testes
 
 Projeto de testes:
 
@@ -319,32 +191,46 @@ Cobertura implementada:
 
 | Teste | Verifica |
 |---|---|
-| `CEPInvalidoNaoChamaGatewayNemRepositorio` | CEP inválido não chama API nem banco. |
-| `CEPSucessoChamaGatewayESalvaHistorico` | Consulta válida chama gateway e salva histórico. |
-| `ErroDeAPIEConvertidoEmDTOEPersistido` | Erro de API vira DTO de erro persistível. |
-| `FalhaAoSalvarNaoImpedeRetornoDoDTO` | Falha de persistência não derruba a consulta. |
+| `TCEPTests` | CEP valido, curto, vazio e com letras. |
+| `CEPInvalidoNaoChamaGatewayNemRepositorio` | CEP invalido nao chama API nem banco. |
+| `CEPSucessoChamaGatewayESalvaHistorico` | Consulta valida chama gateway e salva historico. |
+| `ErroDeAPIEConvertidoEmDTOEPersistido` | Excecao do gateway vira DTO `rcErroAPI` e e persistida. |
+| `FalhaAoSalvarNaoImpedeRetornoDoDTO` | Falha de persistencia nao impede retorno para a tela. |
 
-## Resultados Entregues
+## Estrutura
 
-| Área | Resultado |
-|---|---|
-| **Concepção** | Objetivo, escopo, requisitos, riscos e casos de uso definidos. |
-| **Elaboração** | Modelo de domínio, sequência, classe, camadas, pacotes e persistência definidos. |
-| **Construção** | Aplicação Delphi VCL implementada em MVC com interfaces. |
-| **Banco** | Firebird criado, DDL executado e histórico operacional. |
-| **Qualidade** | Testes DUnitX e fakes para regras do Model. |
-| **UX** | Tela responsiva durante consultas por uso de `TTask`. |
-
-## Evoluções Futuras
-
-| Ideia | Ganho |
-|---|---|
-| Selecionar gateway ativo diretamente pela tabela `GATEWAY_CONFIG` | Troca de API sem recompilar. |
-| Adicionar retry e fallback automático ViaCEP → BrasilAPI | Mais resiliência em falhas externas. |
-| Criar Firebird Embedded opcional | Instalação mais simples em ambiente desktop. |
-| Exportar histórico para CSV/PDF | Auditoria e suporte operacional. |
-| Ampliar testes para Controller e Repository | Maior cobertura da arquitetura. |
-
----
-
-**ConsultaCEP MVC** demonstra uma aplicação Delphi moderna, separada por responsabilidades, com persistência Firebird, integração REST, UI responsiva e base de testes unitários.
+```text
+ConsultaCEP_MVC/
+|-- ConsultaCEP_MVC.dpr
+|-- ConsultaCEP_MVC.dproj
+|-- config/
+|   `-- ConsultaCEP.ini
+|-- SQL/
+|   `-- ConsultaCEP.Firebird.ddl.sql
+|-- Source/
+|   |-- Bootstrap/
+|   |   `-- App.Registration.pas
+|   |-- Controller/
+|   |   `-- ConsultaCEP.Controller.pas
+|   |-- Domain/
+|   |   |-- ConsultaCEP.CEP.pas
+|   |   |-- ConsultaCEP.DTO.pas
+|   |   `-- ConsultaCEP.Interfaces.pas
+|   |-- Infra/
+|   |   `-- ConsultaCEP.Logger.pas
+|   |-- Integration/
+|   |   |-- ConsultaCEP.Gateway.BrasilAPI.pas
+|   |   `-- ConsultaCEP.Gateway.ViaCEP.pas
+|   |-- Persistence/
+|   |   `-- ConsultaCEP.Repository.FireDAC.pas
+|   |-- Service/
+|   |   `-- ConsultaCEP.Service.pas
+|   `-- View/
+|       |-- ConsultaCEP.View.Main.dfm
+|       `-- ConsultaCEP.View.Main.pas
+`-- Tests/
+    |-- ConsultaCEP.Tests.CEP.pas
+    |-- ConsultaCEP.Tests.Service.pas
+    |-- ConsultaCEP.Tests.dpr
+    `-- ConsultaCEP.Tests.dproj
+```

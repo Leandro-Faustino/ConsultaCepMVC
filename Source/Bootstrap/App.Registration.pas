@@ -18,67 +18,130 @@ uses
   ConsultaCEP.Gateway.BrasilAPI,
   ConsultaCEP.Gateway.ViaCEP,
   ConsultaCEP.Interfaces,
-  ConsultaCEP.Model,
+  ConsultaCEP.Logger,
   ConsultaCEP.Repository.FireDAC,
+  ConsultaCEP.Service,
   FireDAC.Comp.Client,
-  System.SysUtils,
-  Vcl.Dialogs;
+  FireDAC.Comp.UI,
+  FireDAC.Stan.Def,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Pool,
+  System.IniFiles,
+  System.SysUtils;
+
+const
+  CConnectionDefName = 'ConsultaCEP_Pool';
 
 var
-  GConnection: TFDConnection;
   GController: IConsultaCEPController;
 
-function ResolverCaminhoBanco: string;
-var
-  LExeDir: string;
-  LProjectDirFromDebug: string;
+function AppPath(const ARelativePath: string): string;
 begin
-  LExeDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)));
-  Result := LExeDir + 'Database\CONSULTACEP_MVC.FDB';
+  Result := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    ARelativePath;
+end;
+
+function ProjectPathFallback(const ARelativePath: string): string;
+begin
+  Result := ExpandFileName(IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    '..\..\' + ARelativePath);
+end;
+
+function ResolverCaminhoBanco(const AConfiguredPath: string): string;
+begin
+  if not AConfiguredPath.Trim.IsEmpty then
+    Exit(ExpandFileName(AConfiguredPath));
+
+  Result := AppPath('Database\CONSULTACEP_MVC.FDB');
   if FileExists(Result) then
     Exit;
 
-  LProjectDirFromDebug := ExpandFileName(LExeDir + '..\..\Database\CONSULTACEP_MVC.FDB');
-  if FileExists(LProjectDirFromDebug) then
-    Exit(LProjectDirFromDebug);
+  Result := ProjectPathFallback('Database\CONSULTACEP_MVC.FDB');
+end;
+
+function ResolverCaminhoIni: string;
+begin
+  Result := AppPath('config\ConsultaCEP.ini');
+  if FileExists(Result) then
+    Exit;
+
+  Result := ProjectPathFallback('config\ConsultaCEP.ini');
+end;
+
+procedure RegistrarConnectionDef(const ADatabase: string);
+var
+  LDef: IFDStanConnectionDef;
+begin
+  if FDManager.ConnectionDefs.FindConnectionDef(CConnectionDefName) <> nil then
+    Exit;
+
+  LDef := FDManager.ConnectionDefs.AddConnectionDef;
+  LDef.Name := CConnectionDefName;
+  LDef.Params.DriverID := 'FB';
+  LDef.Params.Values['Database'] := ADatabase;
+  LDef.Params.Values['User_Name'] := 'SYSDBA';
+  LDef.Params.Values['Password'] := 'masterkey';
+  LDef.Params.Values['CharacterSet'] := 'UTF8';
+  LDef.Params.Values['Protocol'] := 'TCPIP';
+  LDef.Params.Values['Server'] := 'localhost';
+  LDef.Params.Values['Pooled'] := 'True';
+  LDef.Params.Values['POOL_MaximumItems'] := '5';
+  FDManager.Active := True;
+end;
+
+function CriarConnectionFactory: TConnectionFactory;
+begin
+  Result :=
+    function: TFDConnection
+    begin
+      Result := TFDConnection.Create(nil);
+      Result.LoginPrompt := False;
+      Result.ConnectionDefName := CConnectionDefName;
+      Result.Connected := True;
+    end;
+end;
+
+function CriarGateway(const AIni: TIniFile): IGatewayEndereco;
+var
+  LGateway: string;
+begin
+  LGateway := AIni.ReadString('Gateway', 'Ativo', 'ViaCEP').Trim;
+  if SameText(LGateway, 'BrasilAPI') then
+    Exit(TBrasilAPIAdapter.Create(AIni.ReadString('BrasilAPI', 'URLBase',
+      'https://brasilapi.com.br/api/cep/v1')));
+
+  Result := TViaCEPAdapter.Create(AIni.ReadString('ViaCEP', 'URLBase',
+    'https://viacep.com.br/ws'));
 end;
 
 class procedure TAppRegistration.Configurar(AForm: TFormMain);
 var
+  LIni: TIniFile;
   LGateway: IGatewayEndereco;
   LRepositorio: IRepositorioConsulta;
-  LModel: IConsultaCEPModel;
+  LService: IConsultaCEPService;
+  LLogger: ILogger;
+  LConnectionFactory: TConnectionFactory;
   LDatabase: string;
 begin
   if AForm = nil then
     raise EArgumentNilException.Create('AForm nao pode ser nil');
 
-  LDatabase := ResolverCaminhoBanco;
-
-  GConnection := TFDConnection.Create(nil);
-  GConnection.DriverName := 'FB';
-  GConnection.LoginPrompt := False;
-  GConnection.Params.Values['Database'] := LDatabase;
-  GConnection.Params.Values['User_Name'] := 'SYSDBA';
-  GConnection.Params.Values['Password'] := 'masterkey';
-  GConnection.Params.Values['CharacterSet'] := 'UTF8';
-  GConnection.Params.Values['Protocol'] := 'TCPIP';
-  GConnection.Params.Values['Server'] := 'localhost';
-
-  LGateway := TViaCEPAdapter.Create;
-  // Para trocar sem tocar nas camadas: use TBrasilAPIAdapter.Create aqui.
-  // LGateway := TBrasilAPIAdapter.Create;
-
-  LRepositorio := TRepositorioConsultaFireDAC.Create(GConnection);
-  LModel := TConsultaCEPModel.Create(LGateway, LRepositorio);
-  GController := TConsultaCEPController.Create(AForm, LModel);
-  AForm.SetController(GController);
-
+  LIni := TIniFile.Create(ResolverCaminhoIni);
   try
-    AForm.ExibirMensagem('Pronto. Crie o banco com SQL\ConsultaCEP.Firebird.ddl.sql antes de consultar.');
-  except
-    on E: Exception do
-      ShowMessage(E.Message);
+    LDatabase := ResolverCaminhoBanco(LIni.ReadString('Database', 'Path', ''));
+    RegistrarConnectionDef(LDatabase);
+
+    LConnectionFactory := CriarConnectionFactory();
+    LGateway := CriarGateway(LIni);
+    LLogger := TFileLogger.Create(AppPath('logs\ConsultaCEP.log'));
+    LRepositorio := TRepositorioConsultaFireDAC.Create(LConnectionFactory);
+    LService := TConsultaCEPService.Create(LGateway, LRepositorio, LLogger);
+    GController := TConsultaCEPController.Create(AForm, LService, LLogger);
+    AForm.SetController(GController);
+    AForm.ExibirMensagem('Pronto.');
+  finally
+    LIni.Free;
   end;
 end;
 
@@ -86,6 +149,5 @@ initialization
 
 finalization
   GController := nil;
-  GConnection.Free;
 
 end.

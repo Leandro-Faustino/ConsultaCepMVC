@@ -21,11 +21,11 @@ type
     Cidade: string;
     UF: string;
     Complemento: string;
-    Encontrado: Boolean;
     Resultado: TResultadoConsulta;
     MensagemErro: string;
     class function CEPInvalido(const ACEP: string): TDadosEnderecoDTO; static;
     class function ErroAPI(const ACEP, AMensagem: string): TDadosEnderecoDTO; static;
+    class function CEPNaoEncontrado(const ACEP: string): TDadosEnderecoDTO; static;
   end;
 
   TConsultaCEPRecord = record
@@ -53,9 +53,17 @@ class function TDadosEnderecoDTO.CEPInvalido(
 begin
   Result := Default(TDadosEnderecoDTO);
   Result.CEP := ACEP;
-  Result.Encontrado := False;
   Result.Resultado := rcCEPInvalido;
   Result.MensagemErro := 'CEP invalido. Informe 8 digitos numericos.';
+end;
+
+class function TDadosEnderecoDTO.CEPNaoEncontrado(
+  const ACEP: string): TDadosEnderecoDTO;
+begin
+  Result := Default(TDadosEnderecoDTO);
+  Result.CEP := ACEP;
+  Result.Resultado := rcCEPNaoEncontrado;
+  Result.MensagemErro := 'CEP nao encontrado.';
 end;
 
 class function TDadosEnderecoDTO.ErroAPI(const ACEP,
@@ -63,7 +71,6 @@ class function TDadosEnderecoDTO.ErroAPI(const ACEP,
 begin
   Result := Default(TDadosEnderecoDTO);
   Result.CEP := ACEP;
-  Result.Encontrado := False;
   Result.Resultado := rcErroAPI;
   if AMensagem.Trim.IsEmpty then
     Result.MensagemErro := 'Servico temporariamente indisponivel. Tente novamente mais tarde.'
@@ -96,8 +103,6 @@ begin
     Exit(rcSucesso);
   if LValue = 'NAO_ENCONTRADO' then
     Exit(rcCEPNaoEncontrado);
-  if LValue = 'CEP_INVALIDO' then
-    Exit(rcCEPInvalido);
   Result := rcErroAPI;
 end;
 
@@ -112,7 +117,6 @@ begin
   case Self of
     rcSucesso: Result := 'SUCESSO';
     rcCEPNaoEncontrado: Result := 'NAO_ENCONTRADO';
-    rcCEPInvalido: Result := 'CEP_INVALIDO';
   else
     Result := 'ERRO_API';
   end;

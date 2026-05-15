@@ -15,13 +15,19 @@ type
   IRepositorioConsulta = interface
     ['{84594285-7E8B-47E3-953D-9695923CF896}']
     function Salvar(const AConsulta: TConsultaCEPRecord): Int64;
-    function ListarTodos: TArray<TConsultaCEPRecord>;
+    function ListarRecentes(AMaxRegistros: Integer): TArray<TConsultaCEPRecord>;
   end;
 
-  IConsultaCEPModel = interface
+  IConsultaCEPService = interface
     ['{9809E6E1-C7FE-4523-8F88-29C953C9A9A1}']
     function ConsultarCEP(const ACEP: string): TDadosEnderecoDTO;
-    function ObterHistorico: TArray<TConsultaCEPRecord>;
+    function ObterHistorico(AMaxRegistros: Integer): TArray<TConsultaCEPRecord>;
+  end;
+
+  ILogger = interface
+    ['{73D01F1D-C9B9-4CB1-9AA1-E6C453D88358}']
+    procedure Info(const AMsg: string);
+    procedure Erro(const AMsg: string);
   end;
 
   IConsultaCEPView = interface
@@ -41,4 +47,3 @@ type
 implementation
 
 end.
-

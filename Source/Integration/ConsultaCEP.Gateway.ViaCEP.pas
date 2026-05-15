@@ -4,17 +4,14 @@ interface
 
 uses
   ConsultaCEP.DTO,
-  ConsultaCEP.Interfaces,
-  System.Net.HttpClient;
+  ConsultaCEP.Interfaces;
 
 type
   TViaCEPAdapter = class(TInterfacedObject, IGatewayEndereco)
   private
     FURLBase: string;
-    FHttp: THTTPClient;
   public
     constructor Create(const AURLBase: string = 'https://viacep.com.br/ws');
-    destructor Destroy; override;
     function Nome: string;
     function BuscarEndereco(const ACEP: string): TDadosEnderecoDTO;
   end;
@@ -22,6 +19,7 @@ type
 implementation
 
 uses
+  System.Net.HttpClient,
   System.JSON,
   System.SysUtils;
 
@@ -46,50 +44,44 @@ constructor TViaCEPAdapter.Create(const AURLBase: string);
 begin
   inherited Create;
   FURLBase := NormalizeURLBase(AURLBase);
-  FHttp := THTTPClient.Create;
-  FHttp.ConnectionTimeout := 10000;
-  FHttp.ResponseTimeout := 10000;
-end;
-
-destructor TViaCEPAdapter.Destroy;
-begin
-  FHttp.Free;
-  inherited;
 end;
 
 function TViaCEPAdapter.BuscarEndereco(const ACEP: string): TDadosEnderecoDTO;
 var
+  LHttp: THTTPClient;
   LResponse: IHTTPResponse;
   LJSON: TJSONObject;
 begin
-  LResponse := FHttp.Get(Format('%s/%s/json/', [FURLBase, ACEP]));
-  if LResponse.StatusCode <> 200 then
-    raise Exception.CreateFmt('ViaCEP retornou HTTP %d', [LResponse.StatusCode]);
-
-  LJSON := TJSONObject.ParseJSONValue(LResponse.ContentAsString(TEncoding.UTF8)) as TJSONObject;
+  LHttp := THTTPClient.Create;
   try
-    if LJSON = nil then
-      raise Exception.Create('Resposta JSON invalida da ViaCEP');
+    LHttp.ConnectionTimeout := 10000;
+    LHttp.ResponseTimeout := 10000;
+    LResponse := LHttp.Get(Format('%s/%s/json/', [FURLBase, ACEP]));
+    if LResponse.StatusCode <> 200 then
+      raise Exception.CreateFmt('ViaCEP retornou HTTP %d', [LResponse.StatusCode]);
 
-    Result := Default(TDadosEnderecoDTO);
-    Result.CEP := ACEP;
-    if SameText(JSONString(LJSON, 'erro'), 'true') then
-    begin
-      Result.Encontrado := False;
-      Result.Resultado := rcCEPNaoEncontrado;
-      Result.MensagemErro := 'CEP nao encontrado.';
-      Exit;
+    LJSON := TJSONObject.ParseJSONValue(
+      LResponse.ContentAsString(TEncoding.UTF8)) as TJSONObject;
+    try
+      if LJSON = nil then
+        raise Exception.Create('Resposta JSON invalida da ViaCEP');
+
+      if SameText(JSONString(LJSON, 'erro'), 'true') then
+        Exit(TDadosEnderecoDTO.CEPNaoEncontrado(ACEP));
+
+      Result := Default(TDadosEnderecoDTO);
+      Result.CEP := ACEP;
+      Result.Resultado := rcSucesso;
+      Result.Logradouro := JSONString(LJSON, 'logradouro');
+      Result.Bairro := JSONString(LJSON, 'bairro');
+      Result.Cidade := JSONString(LJSON, 'localidade');
+      Result.UF := JSONString(LJSON, 'uf');
+      Result.Complemento := JSONString(LJSON, 'complemento');
+    finally
+      LJSON.Free;
     end;
-
-    Result.Encontrado := True;
-    Result.Resultado := rcSucesso;
-    Result.Logradouro := JSONString(LJSON, 'logradouro');
-    Result.Bairro := JSONString(LJSON, 'bairro');
-    Result.Cidade := JSONString(LJSON, 'localidade');
-    Result.UF := JSONString(LJSON, 'uf');
-    Result.Complemento := JSONString(LJSON, 'complemento');
   finally
-    LJSON.Free;
+    LHttp.Free;
   end;
 end;
 

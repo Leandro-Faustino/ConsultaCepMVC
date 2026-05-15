@@ -7,10 +7,12 @@ uses
   DUnitX.Loggers.Console,
   DUnitX.TestFramework,
   DUnitX.TestRunner,
-  ConsultaCEP.Tests.Model in 'ConsultaCEP.Tests.Model.pas',
+  ConsultaCEP.Tests.CEP in 'ConsultaCEP.Tests.CEP.pas',
+  ConsultaCEP.Tests.Service in 'ConsultaCEP.Tests.Service.pas',
+  ConsultaCEP.CEP in '..\Source\Domain\ConsultaCEP.CEP.pas',
   ConsultaCEP.DTO in '..\Source\Domain\ConsultaCEP.DTO.pas',
   ConsultaCEP.Interfaces in '..\Source\Domain\ConsultaCEP.Interfaces.pas',
-  ConsultaCEP.Model in '..\Source\Model\ConsultaCEP.Model.pas';
+  ConsultaCEP.Service in '..\Source\Service\ConsultaCEP.Service.pas';
 
 var
   LRunner: ITestRunner;

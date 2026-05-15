@@ -6,36 +6,31 @@ uses
   ConsultaCEP.DTO,
   ConsultaCEP.Interfaces,
   System.Classes,
-  System.UITypes,
   Vcl.Controls,
   Vcl.Forms,
-  Vcl.Graphics,
   Vcl.Grids,
   Vcl.StdCtrls;
 
 type
   TFormMain = class(TForm, IConsultaCEPView)
-  private
-    FController: IConsultaCEPController;
-    FCEP: TEdit;
-    FBuscar: TButton;
-    FHistorico: TButton;
-    FStatus: TLabel;
-    FLogradouro: TLabel;
-    FBairro: TLabel;
-    FCidade: TLabel;
-    FUF: TLabel;
-    FComplemento: TLabel;
-    FGrid: TStringGrid;
-    procedure BuscarClick(Sender: TObject);
-    procedure HistoricoClick(Sender: TObject);
-    procedure CEPKeyPress(Sender: TObject; var Key: Char);
-    procedure CEPKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure CriarControles;
+    edtCEP: TEdit;
+    btnBuscar: TButton;
+    btnHistorico: TButton;
+    lblStatus: TLabel;
+    lblLogradouro: TLabel;
+    lblBairro: TLabel;
+    lblCidade: TLabel;
+    lblUF: TLabel;
+    lblComplemento: TLabel;
+    gridHistorico: TStringGrid;
+    procedure btnBuscarClick(Sender: TObject);
+    procedure btnHistoricoClick(Sender: TObject);
+    procedure edtCEPKeyPress(Sender: TObject; var Key: Char);
+  strict private
+    [weak] FController: IConsultaCEPController;
     procedure PrepararGrid;
     procedure LimparEndereco;
   public
-    constructor Create(AOwner: TComponent); override;
     procedure SetController(const AController: IConsultaCEPController);
     procedure AtualizarEndereco(const ADTO: TDadosEnderecoDTO);
     procedure ExibirMensagem(const AMensagem: string);
@@ -48,135 +43,45 @@ var
 
 implementation
 
-uses
-  System.SysUtils,
-  Winapi.Windows;
+{$R *.dfm}
 
-constructor TFormMain.Create(AOwner: TComponent);
-begin
-  inherited CreateNew(AOwner);
-  Caption := 'ConsultaCEP MVC';
-  Width := 760;
-  Height := 520;
-  Position := poScreenCenter;
-  CriarControles;
-  PrepararGrid;
-end;
+uses
+  Spring,
+  System.SysUtils;
 
 procedure TFormMain.AtualizarEndereco(const ADTO: TDadosEnderecoDTO);
 begin
-  FStatus.Caption := ADTO.Resultado.ToUserMessage;
-  FLogradouro.Caption := 'Logradouro: ' + ADTO.Logradouro;
-  FBairro.Caption := 'Bairro: ' + ADTO.Bairro;
-  FCidade.Caption := 'Cidade: ' + ADTO.Cidade;
-  FUF.Caption := 'UF: ' + ADTO.UF;
-  FComplemento.Caption := 'Complemento: ' + ADTO.Complemento;
+  lblStatus.Caption := ADTO.Resultado.ToUserMessage;
+  lblLogradouro.Caption := 'Logradouro: ' + ADTO.Logradouro;
+  lblBairro.Caption := 'Bairro: ' + ADTO.Bairro;
+  lblCidade.Caption := 'Cidade: ' + ADTO.Cidade;
+  lblUF.Caption := 'UF: ' + ADTO.UF;
+  lblComplemento.Caption := 'Complemento: ' + ADTO.Complemento;
 end;
 
-procedure TFormMain.BuscarClick(Sender: TObject);
+procedure TFormMain.btnBuscarClick(Sender: TObject);
 begin
   if FController <> nil then
-    FController.ConsultarCEP(FCEP.Text);
+    FController.ConsultarCEP(edtCEP.Text);
 end;
 
-procedure TFormMain.CEPKeyDown(Sender: TObject; var Key: Word;
-  Shift: TShiftState);
+procedure TFormMain.btnHistoricoClick(Sender: TObject);
 begin
-  if Key = VK_RETURN then
+  if FController <> nil then
+    FController.SolicitarHistorico;
+end;
+
+procedure TFormMain.edtCEPKeyPress(Sender: TObject; var Key: Char);
+begin
+  if Key = #13 then
   begin
-    Key := 0;
-    BuscarClick(Sender);
+    Key := #0;
+    btnBuscarClick(Sender);
+    Exit;
   end;
-end;
 
-procedure TFormMain.CEPKeyPress(Sender: TObject; var Key: Char);
-begin
   if not CharInSet(Key, ['0'..'9', #8]) then
     Key := #0;
-end;
-
-procedure TFormMain.CriarControles;
-var
-  LTitulo: TLabel;
-begin
-  LTitulo := TLabel.Create(Self);
-  LTitulo.Parent := Self;
-  LTitulo.Caption := 'Consulta de CEP';
-  LTitulo.Left := 16;
-  LTitulo.Top := 16;
-  LTitulo.Font.Size := 16;
-  LTitulo.Font.Style := [TFontStyle.fsBold];
-
-  FCEP := TEdit.Create(Self);
-  FCEP.Parent := Self;
-  FCEP.Left := 16;
-  FCEP.Top := 56;
-  FCEP.Width := 160;
-  FCEP.MaxLength := 8;
-  FCEP.TextHint := 'Digite 8 numeros';
-  FCEP.OnKeyPress := CEPKeyPress;
-  FCEP.OnKeyDown := CEPKeyDown;
-
-  FBuscar := TButton.Create(Self);
-  FBuscar.Parent := Self;
-  FBuscar.Left := 184;
-  FBuscar.Top := 54;
-  FBuscar.Width := 96;
-  FBuscar.Caption := 'Buscar';
-  FBuscar.OnClick := BuscarClick;
-
-  FHistorico := TButton.Create(Self);
-  FHistorico.Parent := Self;
-  FHistorico.Left := 288;
-  FHistorico.Top := 54;
-  FHistorico.Width := 120;
-  FHistorico.Caption := 'Ver historico';
-  FHistorico.OnClick := HistoricoClick;
-
-  FStatus := TLabel.Create(Self);
-  FStatus.Parent := Self;
-  FStatus.Left := 16;
-  FStatus.Top := 92;
-  FStatus.Width := 700;
-  FStatus.Caption := 'Pronto.';
-
-  FLogradouro := TLabel.Create(Self);
-  FLogradouro.Parent := Self;
-  FLogradouro.Left := 16;
-  FLogradouro.Top := 128;
-  FLogradouro.Width := 700;
-
-  FBairro := TLabel.Create(Self);
-  FBairro.Parent := Self;
-  FBairro.Left := 16;
-  FBairro.Top := 152;
-  FBairro.Width := 700;
-
-  FCidade := TLabel.Create(Self);
-  FCidade.Parent := Self;
-  FCidade.Left := 16;
-  FCidade.Top := 176;
-  FCidade.Width := 700;
-
-  FUF := TLabel.Create(Self);
-  FUF.Parent := Self;
-  FUF.Left := 16;
-  FUF.Top := 200;
-  FUF.Width := 700;
-
-  FComplemento := TLabel.Create(Self);
-  FComplemento.Parent := Self;
-  FComplemento.Left := 16;
-  FComplemento.Top := 224;
-  FComplemento.Width := 700;
-
-  FGrid := TStringGrid.Create(Self);
-  FGrid.Parent := Self;
-  FGrid.Left := 16;
-  FGrid.Top := 264;
-  FGrid.Width := 710;
-  FGrid.Height := 200;
-  FGrid.Anchors := [akLeft, akTop, akRight, akBottom];
 end;
 
 procedure TFormMain.ExibirHistorico(
@@ -187,76 +92,70 @@ begin
   PrepararGrid;
   if Length(ARegistros) = 0 then
   begin
-    FStatus.Caption := 'Nenhuma consulta registrada.';
+    lblStatus.Caption := 'Nenhuma consulta registrada.';
     Exit;
   end;
 
-  FGrid.RowCount := Length(ARegistros) + 1;
+  gridHistorico.RowCount := Length(ARegistros) + 1;
   for I := 0 to High(ARegistros) do
   begin
-    FGrid.Cells[0, I + 1] := ARegistros[I].CEP;
-    FGrid.Cells[1, I + 1] := FormatDateTime('dd/mm/yyyy hh:nn:ss',
+    gridHistorico.Cells[0, I + 1] := ARegistros[I].CEP;
+    gridHistorico.Cells[1, I + 1] := FormatDateTime('dd/mm/yyyy hh:nn:ss',
       ARegistros[I].DataHora);
-    FGrid.Cells[2, I + 1] := ARegistros[I].Cidade;
-    FGrid.Cells[3, I + 1] := ARegistros[I].Resultado.ToDatabaseValue;
-    FGrid.Cells[4, I + 1] := ARegistros[I].GatewayUsado;
+    gridHistorico.Cells[2, I + 1] := ARegistros[I].Cidade;
+    gridHistorico.Cells[3, I + 1] := ARegistros[I].Resultado.ToDatabaseValue;
+    gridHistorico.Cells[4, I + 1] := ARegistros[I].GatewayUsado;
   end;
 end;
 
 procedure TFormMain.ExibirMensagem(const AMensagem: string);
 begin
-  FStatus.Caption := AMensagem;
+  lblStatus.Caption := AMensagem;
   if not SameText(AMensagem, 'Nenhuma consulta registrada.') then
     LimparEndereco;
 end;
 
-procedure TFormMain.HistoricoClick(Sender: TObject);
-begin
-  if FController <> nil then
-    FController.SolicitarHistorico;
-end;
-
 procedure TFormMain.LimparEndereco;
 begin
-  FLogradouro.Caption := 'Logradouro:';
-  FBairro.Caption := 'Bairro:';
-  FCidade.Caption := 'Cidade:';
-  FUF.Caption := 'UF:';
-  FComplemento.Caption := 'Complemento:';
+  lblLogradouro.Caption := 'Logradouro:';
+  lblBairro.Caption := 'Bairro:';
+  lblCidade.Caption := 'Cidade:';
+  lblUF.Caption := 'UF:';
+  lblComplemento.Caption := 'Complemento:';
 end;
 
 procedure TFormMain.PrepararGrid;
 begin
-  FGrid.ColCount := 5;
-  FGrid.FixedRows := 1;
-  FGrid.RowCount := 2;
-  FGrid.Cells[0, 0] := 'CEP';
-  FGrid.Cells[1, 0] := 'Data/Hora';
-  FGrid.Cells[2, 0] := 'Cidade';
-  FGrid.Cells[3, 0] := 'Resultado';
-  FGrid.Cells[4, 0] := 'Gateway';
-  FGrid.ColWidths[0] := 90;
-  FGrid.ColWidths[1] := 150;
-  FGrid.ColWidths[2] := 180;
-  FGrid.ColWidths[3] := 130;
-  FGrid.ColWidths[4] := 110;
+  gridHistorico.ColCount := 5;
+  gridHistorico.FixedRows := 1;
+  gridHistorico.RowCount := 2;
+  gridHistorico.Cells[0, 0] := 'CEP';
+  gridHistorico.Cells[1, 0] := 'Data/Hora';
+  gridHistorico.Cells[2, 0] := 'Cidade';
+  gridHistorico.Cells[3, 0] := 'Resultado';
+  gridHistorico.Cells[4, 0] := 'Gateway';
+  gridHistorico.ColWidths[0] := 90;
+  gridHistorico.ColWidths[1] := 150;
+  gridHistorico.ColWidths[2] := 180;
+  gridHistorico.ColWidths[3] := 130;
+  gridHistorico.ColWidths[4] := 110;
 end;
 
 procedure TFormMain.SetCarregando(AValor: Boolean);
 begin
-  FBuscar.Enabled := not AValor;
-  FHistorico.Enabled := not AValor;
-  FCEP.Enabled := not AValor;
+  btnBuscar.Enabled := not AValor;
+  btnHistorico.Enabled := not AValor;
+  edtCEP.Enabled := not AValor;
   if AValor then
-    FStatus.Caption := 'Consultando...';
+    lblStatus.Caption := 'Consultando...';
 end;
 
 procedure TFormMain.SetController(
   const AController: IConsultaCEPController);
 begin
-  if AController = nil then
-    raise EArgumentNilException.Create('AController nao pode ser nil');
+  Guard.CheckNotNull(AController, 'AController');
   FController := AController;
+  PrepararGrid;
 end;
 
 end.

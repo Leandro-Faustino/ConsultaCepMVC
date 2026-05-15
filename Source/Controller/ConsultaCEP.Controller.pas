@@ -10,10 +10,11 @@ type
   TConsultaCEPController = class(TInterfacedObject, IConsultaCEPController)
   private
     FView: IConsultaCEPView;
-    FModel: IConsultaCEPModel;
+    FService: IConsultaCEPService;
+    FLogger: ILogger;
   public
     constructor Create(const AView: IConsultaCEPView;
-      const AModel: IConsultaCEPModel);
+      const AService: IConsultaCEPService; const ALogger: ILogger);
     procedure ConsultarCEP(const ACEP: string);
     procedure SolicitarHistorico;
   end;
@@ -21,21 +22,21 @@ type
 implementation
 
 uses
+  Spring,
   System.Classes,
   System.SysUtils,
   System.Threading;
 
 constructor TConsultaCEPController.Create(const AView: IConsultaCEPView;
-  const AModel: IConsultaCEPModel);
+  const AService: IConsultaCEPService; const ALogger: ILogger);
 begin
   inherited Create;
-  if AView = nil then
-    raise EArgumentNilException.Create('AView nao pode ser nil');
-  if AModel = nil then
-    raise EArgumentNilException.Create('AModel nao pode ser nil');
-
+  Guard.CheckNotNull(AView, 'AView');
+  Guard.CheckNotNull(AService, 'AService');
+  Guard.CheckNotNull(ALogger, 'ALogger');
   FView := AView;
-  FModel := AModel;
+  FService := AService;
+  FLogger := ALogger;
 end;
 
 procedure TConsultaCEPController.ConsultarCEP(const ACEP: string);
@@ -51,14 +52,17 @@ begin
       LErro: string;
     begin
       try
-        LDTO := FModel.ConsultarCEP(ACEP);
-        LRegistros := FModel.ObterHistorico;
+        LDTO := FService.ConsultarCEP(ACEP);
+        LRegistros := FService.ObterHistorico(10000);
         LMensagem := LDTO.MensagemErro;
         if LMensagem.Trim.IsEmpty then
           LMensagem := LDTO.Resultado.ToUserMessage;
       except
         on E: Exception do
+        begin
           LErro := E.Message;
+          FLogger.Erro('Erro inesperado no controller: ' + E.Message);
+        end;
       end;
 
       TThread.Queue(nil,
@@ -94,10 +98,13 @@ begin
       LErro: string;
     begin
       try
-        LRegistros := FModel.ObterHistorico;
+        LRegistros := FService.ObterHistorico(10000);
       except
         on E: Exception do
+        begin
           LErro := E.Message;
+          FLogger.Erro('Erro ao carregar historico: ' + E.Message);
+        end;
       end;
 
       TThread.Queue(nil,
